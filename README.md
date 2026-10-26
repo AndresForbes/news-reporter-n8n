@@ -86,7 +86,7 @@ Publico el contenido mediante un bot de Telegram.
 
 Cuando Telegram confirma el envío, registro la noticia en Data Table mediante la operación `Upsert`.
 
-## 📥 Instalación e importación
+## Instalación e importación
 
 Para utilizar este proyecto en otra instalación de n8n:
 
