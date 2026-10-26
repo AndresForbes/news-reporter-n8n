@@ -1,0 +1,931 @@
+{
+  "name": "News Reporter - Agente de noticias con IA",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1536,
+        -16
+      ],
+      "id": "8098528b-2bae-4dc7-a082-03813965c00a",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "url": "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/section/tecnologia/portada",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "outputPropertyName": "rss_xml"
+            }
+          },
+          "proxy": ""
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1232,
+        -16
+      ],
+      "id": "fd07cbc2-0ecf-412a-9f63-4668af23d935",
+      "name": "Obtener RSS - El País"
+    },
+    {
+      "parameters": {
+        "dataPropertyName": "rss_xml",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.xml",
+      "typeVersion": 1,
+      "position": [
+        -880,
+        -16
+      ],
+      "id": "ca1b3dcf-8763-437a-b9bf-840f9e757e0f",
+      "name": "Convertir RSS a JSON"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "rss.channel.item",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -544,
+        -16
+      ],
+      "id": "b1c41fd3-ea1e-48ab-930c-f45e0b58f244",
+      "name": "Separar noticias"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7a776c56-7be2-4877-869b-8261b53cb178",
+              "name": "fecha_iso",
+              "value": "={{ new Date($json.pubDate).toISOString() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -224,
+        -16
+      ],
+      "id": "50bc3e26-fcce-4c0b-a678-ea53143380ef",
+      "name": "Preparar datos de noticias"
+    },
+    {
+      "parameters": {
+        "sortFieldsUi": {
+          "sortField": [
+            {
+              "fieldName": "fecha_iso",
+              "order": "descending"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.sort",
+      "typeVersion": 1,
+      "position": [
+        80,
+        -16
+      ],
+      "id": "a8c34762-b21b-48db-92d0-ff0f6320160e",
+      "name": "Ordenar por fecha"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        352,
+        -16
+      ],
+      "id": "92619228-b817-4c49-af93-8ec5283e83d9",
+      "name": "Seleccionar noticia mas reciente"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e3178dac-beb7-478d-a87c-2fed08dafed3",
+              "name": "titulo",
+              "value": "={{ $json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "f1e9ca84-e15d-41d4-bfbb-0650311785f1",
+              "name": "descripcion",
+              "value": "={{ $json.description }}",
+              "type": "string"
+            },
+            {
+              "id": "35c3a239-224a-44bb-9c90-a0851dff680f",
+              "name": "enlace",
+              "value": "={{ $json.link }}",
+              "type": "string"
+            },
+            {
+              "id": "54043483-7141-4d47-bc30-1bad68031e9b",
+              "name": "fecha",
+              "value": "={{ $json.fecha_iso }}",
+              "type": "string"
+            },
+            {
+              "id": "87a4776f-6658-4f08-be72-84be496c8ecc",
+              "name": "fuente",
+              "value": "EL PAÍS",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        656,
+        -16
+      ],
+      "id": "b3d2685e-c375-41b0-975d-2db9677bd5bf",
+      "name": "Preparar noticia para IA"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "=models/gemini-3.5-flash-lite",
+          "mode": "id"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Actúa como un redactor especializado en tecnología e innovación para un medio digital dirigido al público general.\n\nTu tarea es transformar la información proporcionada en una publicación breve para Telegram y generar un prompt para una imagen ilustrativa.\n\nINFORMACIÓN DISPONIBLE:\n\nTítulo: {{ $json.titulo }}\n\nDescripción: {{ $json.descripcion }}\n\nFuente: {{ $json.fuente }}\n\nFecha: {{ $json.fecha }}\n\nINSTRUCCIONES EDITORIALES:\n\n1. Redacta un resumen en español de entre 50 y 90 palabras.\n2. Utiliza un tono informativo, cercano y divulgativo.\n3. Mantén la precisión de la información original.\n4. Trabaja únicamente con el título y la descripción proporcionados. No tienes acceso al artículo completo.\n5. No inventes datos, cifras, declaraciones, antecedentes ni consecuencias.\n6. No agregues explicaciones técnicas que no estén respaldadas por la información disponible.\n7. Si los datos son insuficientes, redacta un texto más breve en lugar de completar información mediante suposiciones.\n8. No incluyas el enlace de la noticia: lo incorporaremos directamente desde los datos originales.\n\nINSTRUCCIONES PARA LA IMAGEN:\n\n1. Genera un prompt en inglés para una ilustración editorial relacionada con el tema.\n2. La imagen debe ser profesional, clara y coherente con los hechos disponibles.\n3. No representes como hechos detalles que no estén confirmados.\n4. Evita texto, letras, números legibles, logotipos, marcas de agua y señalética visible dentro de la imagen.\n5. Si la noticia menciona marcas, empresas o productos reconocibles, NO generes logotipos, nombres comerciales visibles, escaparates de marca ni versiones inventadas o imitaciones de esas marcas.\n6. Si aparece una marca conocida en la noticia, representa el contexto de forma genérica y editorial. Por ejemplo, muestra una tienda tecnológica premium genérica, un smartphone plegable genérico o consumidores observando tecnología, pero sin branding visible.\n7. No inventes nombres de tiendas, rótulos ni marcas ficticias para sustituir marcas reales.\n8. Prioriza ilustraciones conceptuales o editoriales del producto, la situación o el contexto, en lugar de fachadas comerciales con carteles.\n9. Utiliza un estilo de ilustración editorial moderna.\n\nFORMATO DE RESPUESTA:\n\nDevuelve exclusivamente un objeto JSON válido con estas dos propiedades:\n\n{\n  \"resumen\": \"Texto del resumen en español\",\n  \"prompt_imagen\": \"Image generation prompt in English\"\n}\n\nNo incluyas bloques Markdown, comentarios ni explicaciones fuera del JSON.\n"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        1232,
+        -16
+      ],
+      "id": "80f7b5c2-a48b-4701-b0bc-8fd1bf3f61d0",
+      "name": "Message a model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "PSRtXgeDFkv7EB0p",
+          "name": "Gemini - News Reporter"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst respuesta = $input.first().json;\n\n// 1. Extraer el texto generado por Gemini.\nconst texto = respuesta.content?.parts?.[0]?.text;\n\nif (typeof texto !== 'string' || !texto.trim()) {\n  throw new Error('Gemini no devolvió texto.');\n}\n\n// 2. Convertir el texto JSON en un objeto.\nlet datos;\n\ntry {\n  datos = JSON.parse(texto.trim());\n} catch (error) {\n  throw new Error('Gemini devolvió un JSON inválido: ' + error.message);\n}\n\n// 3. Comprobar los campos obligatorios.\nif (\n  typeof datos.resumen !== 'string' ||\n  !datos.resumen.trim() ||\n  typeof datos.prompt_imagen !== 'string' ||\n  !datos.prompt_imagen.trim()\n) {\n  throw new Error('Faltan resumen o prompt_imagen en la respuesta.');\n}\n\n// 4. Recuperar los datos originales de la noticia.\nconst noticia = $('Preparar noticia para IA').first().json;\n\n// 5. Devolver un único item con la información completa.\nreturn [\n  {\n    json: {\n      titulo: noticia.titulo,\n      descripcion: noticia.descripcion,\n      enlace: noticia.enlace,\n      fecha: noticia.fecha,\n      fuente: noticia.fuente,\n      resumen: datos.resumen.trim(),\n      prompt_imagen: datos.prompt_imagen.trim()\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1664,
+        -16
+      ],
+      "id": "97a2804f-6546-46ec-b484-43640e012899",
+      "name": "Validar respuesta de Gemini"
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://gen.pollinations.ai/image/' + encodeURIComponent($json.prompt_imagen) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "black-forest-labs/flux.1-schnell"
+            },
+            {
+              "name": "width",
+              "value": "1024"
+            },
+            {
+              "name": "height",
+              "value": "1024"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "imagen"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2000,
+        -16
+      ],
+      "id": "077896ad-65a0-46aa-84ab-0742524a2df7",
+      "name": "Generar imagen - Pollinations",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "yj3kZMBeCCKtGUih",
+          "name": "Pollinations - Secret Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "33e2bc9f-a559-4618-aabc-a6ae443c794f",
+              "name": "mensaje_telegram",
+              "value": "={{ '📰 ' + $json.titulo + '\\n\\n' + $json.resumen + '\\n\\n🔗 Fuente: ' + $json.enlace }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2320,
+        -16
+      ],
+      "id": "04039f7d-368b-41cd-886b-8b6a2811f193",
+      "name": "Preparar mensaje para Telegram"
+    },
+    {
+      "parameters": {
+        "operation": "sendPhoto",
+        "chatId": "REEMPLAZAR_CHAT_ID",
+        "binaryData": true,
+        "binaryPropertyName": "imagen",
+        "additionalFields": {
+          "caption": "={{ $json.mensaje_telegram }}"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2640,
+        -16
+      ],
+      "id": "cd93a0da-6df5-4507-a1a7-ce5ee9f4e623",
+      "name": "Publicar noticia en Telegram",
+      "webhookId": "78377092-6286-4f15-a741-52c7b1859ba4",
+      "credentials": {
+        "telegramApi": {
+          "id": "ZhX3pEfSX3IX6Y7L",
+          "name": "Telegram - News Reporter"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "value": "n2Mq1WQyJLQD1g75",
+          "mode": "list",
+          "cachedResultName": "news_reporter_publicadas",
+          "cachedResultUrl": "/projects/LRuAGhkVQYcTluc5/datatables/n2Mq1WQyJLQD1g75"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "enlace",
+              "keyValue": "={{ $('Preparar noticia para IA').first().json.enlace }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "enlace": "={{ $('Preparar noticia para IA').first().json.enlace }}",
+            "titulo": "={{ $('Preparar noticia para IA').first().json.titulo }}",
+            "fecha_publicacion": "={{ $now.toISO() }}",
+            "telegram_message_id": "={{ $json.result.message_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "enlace",
+              "displayName": "enlace",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "titulo",
+              "displayName": "titulo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "fecha_publicacion",
+              "displayName": "fecha_publicacion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "telegram_message_id",
+              "displayName": "telegram_message_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2928,
+        -16
+      ],
+      "id": "690ca9fe-2160-4c54-b0f8-57e181dc90ec",
+      "name": "Registrar noticia publicada",
+      "retryOnFail": true,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "content": "# NEWS REPORTER — Agente de noticias con IA\n\n**Objetivo:** obtener noticias reales de tecnología, resumirlas con IA, generar una imagen ilustrativa y publicarlas automáticamente en Telegram.\n\n**Tecnologías:** n8n, RSS de El País, Google Gemini, Pollinations y Telegram.\n\n**Ejecución:** inicio manual durante las pruebas.\n\n**Presupuesto:** 0 USD. Se utilizan servicios gratuitos y créditos promocionales de Pollinations.\n\n**Control de duplicados:** Data Table comprueba los enlaces ya publicados antes de procesar una noticia.",
+        "height": 368,
+        "width": 880,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1600,
+        -608
+      ],
+      "id": "8a0a82ad-e4e8-4eea-bbb8-33941e001cb9",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "### Manual Trigger\nInicia el workflow manualmente para controlar las pruebas y evitar ejecuciones inesperadas.",
+        "height": 256,
+        "color": "#426780"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1600,
+        240
+      ],
+      "typeVersion": 1,
+      "id": "28b0d439-1598-427e-a3cd-a39abce06b62",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "### Obtener RSS - El País\n\nConsulta mediante HTTP GET el RSS de Tecnología de El País y obtiene noticias reales en formato XML.",
+        "height": 256,
+        "color": "#426780"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1312,
+        240
+      ],
+      "id": "3a9ded68-150f-4218-ad27-c8c40f0275dc",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "### Convertir RSS a JSON\n\nTransforma el XML en una estructura JSON que n8n puede procesar.",
+        "height": 256,
+        "color": "#426780"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -960,
+        240
+      ],
+      "id": "994f6255-20f9-470c-809e-059bdbdb55c4",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "### Separar noticias\n\nConvierte el listado del RSS en elementos independientes, uno por noticia.",
+        "height": 256,
+        "color": "#496E61"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -624,
+        240
+      ],
+      "id": "d6ba34c3-50f0-451b-9322-424287913479",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "### Preparar datos de noticias\n\nNormaliza la fecha de publicación al formato ISO 8601 y conserva los datos originales.",
+        "height": 256,
+        "color": "#496E61"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -288,
+        240
+      ],
+      "id": "a4ba943f-51eb-4be5-97b1-87e81e697642",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "### Ordenar por fecha\n\nOrdena las noticias de la más reciente a la más antigua.",
+        "height": 256,
+        "color": "#496E61"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        240
+      ],
+      "id": "3d50ac61-ec8f-42bc-b13c-917611338677",
+      "name": "Sticky Note6"
+    },
+    {
+      "parameters": {
+        "content": "### Seleccionar noticia más reciente\n\nLimita el procesamiento a una sola noticia por ejecución para reducir consumo y publicaciones innecesarias.",
+        "height": 256,
+        "color": "#496E61"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        288,
+        240
+      ],
+      "id": "353beff9-fe4c-4546-a079-3818badbb79e",
+      "name": "Sticky Note7"
+    },
+    {
+      "parameters": {
+        "content": "### Preparar noticia para IA\n\nOrganiza título, descripción, enlace, fecha y fuente. El RSS proporciona un extracto, no necesariamente el artículo completo.",
+        "height": 256,
+        "color": "#496E61"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        576,
+        240
+      ],
+      "id": "a6648499-59ed-442b-be9c-3ad38581f94b",
+      "name": "Sticky Note8"
+    },
+    {
+      "parameters": {
+        "content": "### Comprobar noticia publicada\n\nConsulta Data Table. Solo permite continuar si el enlace no figura como publicado.",
+        "height": 256,
+        "color": "#705A83"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        880,
+        240
+      ],
+      "id": "bdcd635b-9f5c-41c7-8991-17649d975805",
+      "name": "Sticky Note9"
+    },
+    {
+      "parameters": {
+        "content": "### Google Gemini\n\nGenera un resumen informativo y divulgativo y un prompt visual, utilizando únicamente los datos disponibles en el RSS.",
+        "height": 256,
+        "color": "#515E86"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        240
+      ],
+      "id": "ba22dd06-dcfd-4478-b1a5-9ced36e72381",
+      "name": "Sticky Note10"
+    },
+    {
+      "parameters": {
+        "content": "### Validar respuesta de Gemini\n\nConvierte la respuesta a JSON, comprueba los campos obligatorios y recupera los datos originales.",
+        "height": 256,
+        "color": "#515E86"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1584,
+        240
+      ],
+      "id": "785d7a3b-eb75-45be-9262-2af4604ce764",
+      "name": "Sticky Note11"
+    },
+    {
+      "parameters": {
+        "content": "### Preparar mensaje para Telegram\n\nConstruye el mensaje final con título, resumen y enlace original, conservando la imagen binaria.",
+        "height": 256,
+        "color": "#356E69"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2256,
+        240
+      ],
+      "id": "9a46f9d8-2173-41c5-ab30-dc21da162ae7",
+      "name": "Sticky Note12"
+    },
+    {
+      "parameters": {
+        "content": "### Publicar noticia en Telegram\n\nEnvía la imagen y su pie de foto mediante el bot. Si falla, se detiene el workflow.",
+        "height": 256,
+        "color": "#356E69"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2576,
+        240
+      ],
+      "id": "2ebb5d77-8040-4e04-b1d7-b4d094259a85",
+      "name": "Sticky Note13"
+    },
+    {
+      "parameters": {
+        "content": "### Generar imagen - Pollinations\n\nUtiliza Flux Schnell para generar una imagen ilustrativa. Consume créditos gratuitos Pollen por generación.",
+        "height": 256,
+        "color": "#876447"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1936,
+        240
+      ],
+      "id": "bd8342e8-ed19-4917-bbb0-ab407c33c70a",
+      "name": "Sticky Note14"
+    },
+    {
+      "parameters": {
+        "content": "### Registrar noticia publicada\n\nRegistra enlace, título, fecha y message_id después de Telegram. Utiliza Upsert y reintentos ante fallos transitorios.",
+        "height": 256,
+        "color": "#356E69"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2864,
+        240
+      ],
+      "id": "73de8b03-c4fe-4ef5-9c6f-046a453f6454",
+      "name": "Sticky Note15"
+    },
+    {
+      "parameters": {
+        "content": "## 01 - OBTENCIÓN DE NOTICIAS",
+        "height": 336,
+        "width": 880,
+        "color": "#426780"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1600,
+        -128
+      ],
+      "id": "1c0f3b59-3f19-4edc-8197-0c622f2f7c70",
+      "name": "Sticky Note16"
+    },
+    {
+      "parameters": {
+        "content": "## 02 - PREPARACIÓN DE DATOS",
+        "height": 336,
+        "width": 1440,
+        "color": "#496E61"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -624,
+        -128
+      ],
+      "id": "29260522-f40a-4960-a58e-d7ab71966835",
+      "name": "Sticky Note17"
+    },
+    {
+      "parameters": {
+        "content": "## 03 - CONTROL DE DUPLICADOS",
+        "height": 336,
+        "color": "#705A83"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        880,
+        -128
+      ],
+      "id": "a30af848-d2c8-44d5-acf0-b6320a581404",
+      "name": "Sticky Note18"
+    },
+    {
+      "parameters": {
+        "operation": "rowNotExists",
+        "dataTableId": {
+          "__rl": true,
+          "value": "n2Mq1WQyJLQD1g75",
+          "mode": "list",
+          "cachedResultName": "news_reporter_publicadas",
+          "cachedResultUrl": "/projects/LRuAGhkVQYcTluc5/datatables/n2Mq1WQyJLQD1g75"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "enlace",
+              "keyValue": "={{ $json.enlace }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        944,
+        -16
+      ],
+      "id": "9e760a09-2cb5-43c9-b18d-597f2807889a",
+      "name": "Comprobar noticia publicada"
+    },
+    {
+      "parameters": {
+        "content": "## 04 - PROCESAMIENTO CON IA",
+        "height": 336,
+        "width": 624,
+        "color": "#515E86"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        -128
+      ],
+      "id": "1909f23c-a397-4324-be0a-34163deca563",
+      "name": "Sticky Note19"
+    },
+    {
+      "parameters": {
+        "content": "## 05 - GENERACIÓN DE IMAGEN",
+        "height": 336,
+        "color": "#876447"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1936,
+        -128
+      ],
+      "id": "39a07bb1-2bf8-4552-97f3-025a84506e4a",
+      "name": "Sticky Note20"
+    },
+    {
+      "parameters": {
+        "content": "## 06 - PUBLICACIÓN Y REGISTRO",
+        "height": 336,
+        "width": 848,
+        "color": "#356E69"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2256,
+        -128
+      ],
+      "id": "78f472f7-e13c-4708-b7a7-cefc9ba240ab",
+      "name": "Sticky Note21"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Obtener RSS - El País",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Obtener RSS - El País": {
+      "main": [
+        [
+          {
+            "node": "Convertir RSS a JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convertir RSS a JSON": {
+      "main": [
+        [
+          {
+            "node": "Separar noticias",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Separar noticias": {
+      "main": [
+        [
+          {
+            "node": "Preparar datos de noticias",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar datos de noticias": {
+      "main": [
+        [
+          {
+            "node": "Ordenar por fecha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ordenar por fecha": {
+      "main": [
+        [
+          {
+            "node": "Seleccionar noticia mas reciente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Seleccionar noticia mas reciente": {
+      "main": [
+        [
+          {
+            "node": "Preparar noticia para IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar noticia para IA": {
+      "main": [
+        [
+          {
+            "node": "Comprobar noticia publicada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Validar respuesta de Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar respuesta de Gemini": {
+      "main": [
+        [
+          {
+            "node": "Generar imagen - Pollinations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generar imagen - Pollinations": {
+      "main": [
+        [
+          {
+            "node": "Preparar mensaje para Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar mensaje para Telegram": {
+      "main": [
+        [
+          {
+            "node": "Publicar noticia en Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publicar noticia en Telegram": {
+      "main": [
+        [
+          {
+            "node": "Registrar noticia publicada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comprobar noticia publicada": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "5c81e6c2-4dec-4d54-b98e-74bd98ece66e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7c5fcc6a9b136f12a19b4a9c79eb88b663d4cc7e02ee643a3b15d2de9da05f98"
+  },
+  "nodeGroups": [],
+  "id": "iV7qlEIrMZChIoQj",
+  "tags": []
+}
